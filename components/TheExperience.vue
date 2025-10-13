@@ -9,9 +9,14 @@ const cards = [
     color: '#4ecdc4'
   },
   {
-    position: [0, 0, -0.25] as [number, number, number],
+    position: [0, 0, -0.18] as [number, number, number],
     rotation: [Math.PI / 2, 0.15, 0] as [number, number, number],
     color: '#ff6b6b'
+  },
+  {
+    position: [0, 0, -0.36] as [number, number, number],
+    rotation: [Math.PI / 2, -0.15, 0] as [number, number, number],
+    color: '#f7b731'
   }
 ]
 
