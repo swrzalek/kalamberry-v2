@@ -3,10 +3,114 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import type { Group } from 'three'
 import { Html } from '@tresjs/cientos'
 
-const { onBeforeRender } = useLoop()
+// ============================================================================
+// TYPES & INTERFACES
+// ============================================================================
 
-// Words to display on cards
-const words = [
+interface Vector3Tuple {
+  x: number
+  y: number
+  z: number
+}
+
+interface CardConfig {
+  ref: Ref<Group | null>
+  color: string
+  basePosition: [number, number, number]
+  baseRotation: [number, number, number]
+  wordIndex: number
+}
+
+interface AnimationPhaseResult {
+  position: Vector3Tuple
+  rotation: { y: number; z: number }
+}
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const CARD_DIMENSIONS = {
+  WIDTH: 2.5,
+  THICKNESS: 0.2,
+  HEIGHT: 3.5,
+  SEGMENTS: 3,
+  RADIUS: 0.08,
+} as const
+
+const CARD_SPACING = {
+  MIDDLE: -0.18,
+  BACK: -0.36,
+} as const
+
+const ANIMATION = {
+  SPEED_MULTIPLIER: 1.5,
+  TRANSITION_SMOOTH_FACTOR: 10,
+  TEXT_FADE_DELAY: 100,
+  PHASE_SPLIT: 0.5,
+} as const
+
+const CARD_POSITIONS = {
+  FRONT: 0,
+  MIDDLE: 1,
+  BACK: 2,
+} as const
+
+const ARC_ANIMATION = {
+  PHASE1: {
+    X_DISTANCE: 6,
+    Y_HEIGHT: 1.5,
+    Z_FORWARD: 1,
+    ROTATION_Y: 1.2,
+    ROTATION_Z: 0.3,
+  },
+  PHASE2: {
+    X_POWER: 1.5,
+    Y_POWER: 2,
+    Z_TOTAL: 1.36,
+    ROTATION_Y_TOTAL: 1.35,
+  },
+} as const
+
+const CARD_ROTATIONS = {
+  BASE_X: Math.PI / 2,
+  MIDDLE: 0.15,
+  BACK: -0.15,
+} as const
+
+const CAMERA = {
+  POSITION: [0, 0, 6] as [number, number, number],
+  FOV: 45,
+  LOOK_AT: [0, 0, 0] as [number, number, number],
+} as const
+
+const LIGHTING = {
+  AMBIENT_INTENSITY: 0.6,
+  PRIMARY_INTENSITY: 0.8,
+  SECONDARY_INTENSITY: 0.3,
+  PRIMARY_POSITION: [5, 8, 5] as [number, number, number],
+  SECONDARY_POSITION: [-3, 5, -3] as [number, number, number],
+} as const
+
+const CARD_COLORS = {
+  CARD_1: '#4ecdc4',
+  CARD_2: '#ff6b6b',
+  CARD_3: '#f7b731',
+} as const
+
+const MATERIAL_PROPERTIES = {
+  ROUGHNESS: 0.4,
+  METALNESS: 0.2,
+} as const
+
+const HTML_TEXT = {
+  POSITION: [0, 0, 0.15] as [number, number, number],
+  ROTATION: [-Math.PI / 2, 0, 0] as [number, number, number],
+  DISTANCE_FACTOR: 0.5,
+  VISIBILITY_Z_THRESHOLD: 0.1,
+} as const
+
+const WORDS = [
   'Hello',
   'World',
   'Vue',
@@ -16,241 +120,372 @@ const words = [
   'Cards',
   'Deck',
   'Shuffle',
-  'Amazing'
-]
+  'Amazing',
+] as const
 
-// Track next word index to show (starts at 3 since we're showing 0,1,2 initially)
-const nextWordIndex = ref(3)
+const INITIAL_VISIBLE_CARDS_COUNT = 3
 
-// Card refs - using shallowRef as recommended by TresJS docs (now pointing to Groups)
-const card1Ref = shallowRef<Group | null>(null)
-const card2Ref = shallowRef<Group | null>(null)
-const card3Ref = shallowRef<Group | null>(null)
+// ============================================================================
+// COMPOSABLES & UTILS
+// ============================================================================
 
-// Card data with word indices
-const cards = [
-  { ref: card1Ref, color: '#4ecdc4', basePosition: [0, 0, 0] as [number, number, number], baseRotation: [Math.PI / 2, 0, 0] as [number, number, number], wordIndex: 0 },
-  { ref: card2Ref, color: '#ff6b6b', basePosition: [0, 0, -0.18] as [number, number, number], baseRotation: [Math.PI / 2, 0.15, 0] as [number, number, number], wordIndex: 1 },
-  { ref: card3Ref, color: '#f7b731', basePosition: [0, 0, -0.36] as [number, number, number], baseRotation: [Math.PI / 2, -0.15, 0] as [number, number, number], wordIndex: 2 }
-]
+const { onBeforeRender } = useLoop()
 
-// Track which card is in which position (front=0, middle=1, back=2)
-const cardOrder = ref([0, 1, 2]) // indices into [card1Ref, card2Ref, card3Ref]
-const allCardRefs = [card1Ref, card2Ref, card3Ref]
+/**
+ * Easing function for smooth cubic ease-in-out animation
+ * @param t - Progress value between 0 and 1
+ * @returns Eased progress value
+ */
+const easeInOutCubic = (t: number): number => {
+  return t < ANIMATION.PHASE_SPLIT
+    ? 4 * t * t * t
+    : 1 - Math.pow(-2 * t + 2, 3) / 2
+}
 
-// Reactive word assignments
-const cardWords = ref([
-  words[0],
-  words[1],
-  words[2]
-])
+/**
+ * Normalizes raw progress to a value between 0 and 1
+ */
+const normalizeProgress = (rawProgress: number): number => {
+  return Math.min(rawProgress, 1)
+}
 
-// Computed properties to get the word for each card based on its position in the order
-const card1Word = computed(() => {
-  const positionIndex = cardOrder.value.indexOf(0) // Find where card 0 is in the order
-  return cardWords.value[positionIndex]
-})
-const card2Word = computed(() => {
-  const positionIndex = cardOrder.value.indexOf(1)
-  return cardWords.value[positionIndex]
-})
-const card3Word = computed(() => {
-  const positionIndex = cardOrder.value.indexOf(2)
-  return cardWords.value[positionIndex]
-})
+/**
+ * Calculates phase 1 animation (card moving right and up)
+ */
+const calculatePhase1Animation = (rawProgress: number): AnimationPhaseResult => {
+  const phase1Raw = rawProgress * 2
+  const phase1Progress = easeInOutCubic(phase1Raw)
 
+  return {
+    position: {
+      x: phase1Progress * ARC_ANIMATION.PHASE1.X_DISTANCE,
+      y: phase1Progress * ARC_ANIMATION.PHASE1.Y_HEIGHT,
+      z: phase1Progress * ARC_ANIMATION.PHASE1.Z_FORWARD,
+    },
+    rotation: {
+      y: phase1Progress * ARC_ANIMATION.PHASE1.ROTATION_Y,
+      z: phase1Progress * ARC_ANIMATION.PHASE1.ROTATION_Z,
+    },
+  }
+}
+
+/**
+ * Calculates phase 2 animation (card arcing behind the deck)
+ */
+const calculatePhase2Animation = (rawProgress: number): AnimationPhaseResult => {
+  const phase2Raw = (rawProgress - ANIMATION.PHASE_SPLIT) * 2
+  const phase2Progress = easeInOutCubic(phase2Raw)
+
+  const xArc = ARC_ANIMATION.PHASE1.X_DISTANCE - Math.pow(phase2Progress, ARC_ANIMATION.PHASE2.X_POWER) * ARC_ANIMATION.PHASE1.X_DISTANCE
+  const yArc = ARC_ANIMATION.PHASE1.Y_HEIGHT * (1 - Math.pow(phase2Progress, ARC_ANIMATION.PHASE2.Y_POWER))
+  const zArc = ARC_ANIMATION.PHASE1.Z_FORWARD - phase2Progress * ARC_ANIMATION.PHASE2.Z_TOTAL
+
+  return {
+    position: {
+      x: xArc,
+      y: yArc,
+      z: zArc,
+    },
+    rotation: {
+      y: ARC_ANIMATION.PHASE1.ROTATION_Y - phase2Progress * ARC_ANIMATION.PHASE2.ROTATION_Y_TOTAL,
+      z: ARC_ANIMATION.PHASE1.ROTATION_Z - phase2Progress * ARC_ANIMATION.PHASE1.ROTATION_Z,
+    },
+  }
+}
+
+/**
+ * Applies animation result to a card reference
+ */
+const applyAnimationToCard = (cardRef: Group, animation: AnimationPhaseResult): void => {
+  cardRef.position.x = animation.position.x
+  cardRef.position.y = animation.position.y
+  cardRef.position.z = animation.position.z
+  cardRef.rotation.y = animation.rotation.y
+  cardRef.rotation.z = animation.rotation.z
+}
+
+/**
+ * Smoothly interpolates a value towards a target
+ */
+const smoothLerp = (current: number, target: number, delta: number): number => {
+  return current + (target - current) * delta * ANIMATION.TRANSITION_SMOOTH_FACTOR
+}
+
+// ============================================================================
+// STATE MANAGEMENT
+// ============================================================================
+
+const nextWordIndex = ref(INITIAL_VISIBLE_CARDS_COUNT)
 const isAnimating = ref(false)
 const animationProgress = ref(0)
 const showText = ref(true)
 
-// Easing function for smooth animation (ease-in-out)
-const easeInOutCubic = (t: number): number => {
-  return t < 0.5 
-    ? 4 * t * t * t 
-    : 1 - Math.pow(-2 * t + 2, 3) / 2
+// Card refs - using shallowRef as recommended by TresJS docs
+const card1Ref = shallowRef<Group | null>(null)
+const card2Ref = shallowRef<Group | null>(null)
+const card3Ref = shallowRef<Group | null>(null)
+
+const allCardRefs = [card1Ref, card2Ref, card3Ref] as const
+
+// Card configuration
+const cards: CardConfig[] = [
+  {
+    ref: card1Ref,
+    color: CARD_COLORS.CARD_1,
+    basePosition: [0, 0, 0],
+    baseRotation: [CARD_ROTATIONS.BASE_X, 0, 0],
+    wordIndex: 0,
+  },
+  {
+    ref: card2Ref,
+    color: CARD_COLORS.CARD_2,
+    basePosition: [0, 0, CARD_SPACING.MIDDLE],
+    baseRotation: [CARD_ROTATIONS.BASE_X, CARD_ROTATIONS.MIDDLE, 0],
+    wordIndex: 1,
+  },
+  {
+    ref: card3Ref,
+    color: CARD_COLORS.CARD_3,
+    basePosition: [0, 0, CARD_SPACING.BACK],
+    baseRotation: [CARD_ROTATIONS.BASE_X, CARD_ROTATIONS.BACK, 0],
+    wordIndex: 2,
+  },
+]
+
+// Track which card is in which position (front=0, middle=1, back=2)
+const cardOrder = ref([
+  CARD_POSITIONS.FRONT,
+  CARD_POSITIONS.MIDDLE,
+  CARD_POSITIONS.BACK,
+])
+
+// Reactive word assignments
+const cardWords = ref<string[]>([WORDS[0], WORDS[1], WORDS[2]])
+
+// ============================================================================
+// COMPUTED PROPERTIES
+// ============================================================================
+
+const createCardWordComputed = (cardIndex: 0 | 1 | 2) => {
+  return computed(() => {
+    const positionIndex = cardOrder.value.indexOf(cardIndex)
+    return cardWords.value[positionIndex] ?? ''
+  })
 }
 
-// Create rounded box geometry for the card (width, thickness, height)
-const roundedGeometry = new RoundedBoxGeometry(2.5, 0.2, 3.5, 3, 0.08)
+const card1Word = createCardWordComputed(0)
+const card2Word = createCardWordComputed(1)
+const card3Word = createCardWordComputed(2)
 
-// Initialize card positions on mount
+// ============================================================================
+// GEOMETRY
+// ============================================================================
+
+const roundedGeometry = new RoundedBoxGeometry(
+  CARD_DIMENSIONS.WIDTH,
+  CARD_DIMENSIONS.THICKNESS,
+  CARD_DIMENSIONS.HEIGHT,
+  CARD_DIMENSIONS.SEGMENTS,
+  CARD_DIMENSIONS.RADIUS,
+)
+
+// ============================================================================
+// CARD ANIMATION LOGIC
+// ============================================================================
+
+/**
+ * Initializes all cards to their base positions
+ */
+const initializeCardPositions = (): void => {
+  cards.forEach((card, index) => {
+    if (card.ref.value) {
+      card.ref.value.position.set(...card.basePosition)
+      card.ref.value.rotation.set(...card.baseRotation)
+    }
+  })
+}
+
+/**
+ * Animates the front card through its arc path
+ */
+const animateFrontCard = (frontCardRef: Group, rawProgress: number): void => {
+  const animation = rawProgress < ANIMATION.PHASE_SPLIT
+    ? calculatePhase1Animation(rawProgress)
+    : calculatePhase2Animation(rawProgress)
+
+  applyAnimationToCard(frontCardRef, animation)
+}
+
+/**
+ * Animates the middle card moving forward
+ */
+const animateMiddleCard = (middleCardRef: Group, rawProgress: number, delta: number): void => {
+  const targetZ = rawProgress < ANIMATION.PHASE_SPLIT
+    ? CARD_SPACING.MIDDLE
+    : CARD_SPACING.MIDDLE + easeInOutCubic((rawProgress - ANIMATION.PHASE_SPLIT) * 2) * Math.abs(CARD_SPACING.MIDDLE)
+
+  const targetRotY = rawProgress < ANIMATION.PHASE_SPLIT
+    ? CARD_ROTATIONS.MIDDLE
+    : CARD_ROTATIONS.MIDDLE - easeInOutCubic((rawProgress - ANIMATION.PHASE_SPLIT) * 2) * CARD_ROTATIONS.MIDDLE
+
+  middleCardRef.position.z = smoothLerp(middleCardRef.position.z, targetZ, delta)
+  middleCardRef.rotation.y = smoothLerp(middleCardRef.rotation.y, targetRotY, delta)
+}
+
+/**
+ * Animates the back card moving forward
+ */
+const animateBackCard = (backCardRef: Group, rawProgress: number, delta: number): void => {
+  const targetZ = rawProgress < ANIMATION.PHASE_SPLIT
+    ? CARD_SPACING.BACK
+    : CARD_SPACING.BACK + easeInOutCubic((rawProgress - ANIMATION.PHASE_SPLIT) * 2) * Math.abs(CARD_SPACING.MIDDLE)
+
+  const targetRotY = rawProgress < ANIMATION.PHASE_SPLIT
+    ? CARD_ROTATIONS.BACK
+    : CARD_ROTATIONS.BACK + easeInOutCubic((rawProgress - ANIMATION.PHASE_SPLIT) * 2) * (CARD_ROTATIONS.MIDDLE + Math.abs(CARD_ROTATIONS.BACK))
+
+  backCardRef.position.z = smoothLerp(backCardRef.position.z, targetZ, delta)
+  backCardRef.rotation.y = smoothLerp(backCardRef.rotation.y, targetRotY, delta)
+}
+
+/**
+ * Resets animation and updates card order
+ */
+const completeAnimation = (): void => {
+  // Rotate the order: front card goes to back
+  const frontCard = cardOrder.value.shift()!
+  cardOrder.value.push(frontCard)
+
+  // Set final positions for all cards based on new order
+  cardOrder.value.forEach((cardIndex, positionIndex) => {
+    const cardRef = allCardRefs[cardIndex]
+    if (cardRef?.value && cards[positionIndex]) {
+      cardRef.value.position.set(...cards[positionIndex].basePosition)
+      cardRef.value.rotation.set(...cards[positionIndex].baseRotation)
+    }
+  })
+
+  // Update card words array
+  cardWords.value.shift()
+  const nextWord = WORDS[nextWordIndex.value]
+  if (nextWord) {
+    cardWords.value.push(nextWord)
+  }
+  nextWordIndex.value = (nextWordIndex.value + 1) % WORDS.length
+
+  // Reset animation state
+  isAnimating.value = false
+  animationProgress.value = 0
+
+  // Show text with a delay for smooth fade-in
+  setTimeout(() => {
+    showText.value = true
+  }, ANIMATION.TEXT_FADE_DELAY)
+}
+
+/**
+ * Gets the card ref at a specific position in the order
+ */
+const getCardAtPosition = (position: number): Group | null => {
+  const cardIndex = cardOrder.value[position]
+  return cardIndex !== undefined ? allCardRefs[cardIndex]?.value ?? null : null
+}
+
+// ============================================================================
+// LIFECYCLE HOOKS
+// ============================================================================
+
 onMounted(() => {
-  if (card1Ref.value && cards[0]) {
-    card1Ref.value.position.set(...cards[0].basePosition)
-    card1Ref.value.rotation.set(...cards[0].baseRotation)
-  }
-  if (card2Ref.value && cards[1]) {
-    card2Ref.value.position.set(...cards[1].basePosition)
-    card2Ref.value.rotation.set(...cards[1].baseRotation)
-  }
-  if (card3Ref.value && cards[2]) {
-    card3Ref.value.position.set(...cards[2].basePosition)
-    card3Ref.value.rotation.set(...cards[2].baseRotation)
-  }
+  initializeCardPositions()
 })
 
-// Animation function
-const nextCard = () => {
-  console.log('nextCard called!', isAnimating.value)
-  if (isAnimating.value) return
-  
-  // Hide text immediately
-  showText.value = false
-  
-  isAnimating.value = true
-  animationProgress.value = 0
-  
-  console.log('Animation started')
-}
-
-// Animation loop using TresJS pattern
+/**
+ * Main animation loop
+ */
 onBeforeRender(({ delta }) => {
   if (!isAnimating.value) return
-  
-  // Increment animation progress (frame-rate independent)
-  animationProgress.value += delta * 1.5 // 1.5 = speed multiplier (slightly slower for smoother feel)
-  
-  const rawProgress = Math.min(animationProgress.value, 1)
-  const progress = easeInOutCubic(rawProgress) // Apply easing
-  
-  console.log('Animating, progress:', progress.toFixed(2))
-  
-  // Get the card that's currently in front position
-  const frontCardIndex = cardOrder.value[0]
-  const frontCardRef = frontCardIndex !== undefined ? allCardRefs[frontCardIndex] : null
-  
-  // Animate the front card - arc around the side of the deck
-  if (frontCardRef?.value) {
-    if (rawProgress < 0.5) {
-      // Phase 1: Move card to the right and up (0 to 0.5)
-      const phase1Raw = rawProgress * 2
-      const phase1Progress = easeInOutCubic(phase1Raw)
-      frontCardRef.value.position.x = phase1Progress * 6 // Move right (increased from 5 to 6)
-      frontCardRef.value.position.y = phase1Progress * 1.5 // Move up more (increased from 0.5 to 1.5)
-      frontCardRef.value.position.z = phase1Progress * 1 // Move forward (increased from 0.5 to 1)
-      frontCardRef.value.rotation.y = phase1Progress * 1.2
-      frontCardRef.value.rotation.z = phase1Progress * 0.3
-    } else {
-      // Phase 2: Arc wide around behind the deck (0.5 to 1)
-      const phase2Raw = (rawProgress - 0.5) * 2
-      const phase2Progress = easeInOutCubic(phase2Raw)
-      // Wide arc: stay out on X longer, maintain height, then swoop behind
-      const xArc = 6 - Math.pow(phase2Progress, 1.5) * 6 // Ease in slower on X, stay wide longer
-      const yArc = 1.5 * (1 - Math.pow(phase2Progress, 2)) // Stay elevated, drop at the end
-      const zArc = 1 - phase2Progress * 1.36 // Sweep behind to z=-0.36
-      
-      frontCardRef.value.position.x = xArc // Wide arc to center
-      frontCardRef.value.position.y = yArc // Stay elevated longer
-      frontCardRef.value.position.z = zArc // Go behind
-      // Smoothly transition to the back card's rotation angle (-0.15)
-      frontCardRef.value.rotation.y = 1.2 - phase2Progress * 1.35 // rotate back to -0.15
-      frontCardRef.value.rotation.z = 0.3 - phase2Progress * 0.3
-    }
+
+  animationProgress.value += delta * ANIMATION.SPEED_MULTIPLIER
+  const rawProgress = normalizeProgress(animationProgress.value)
+
+  // Animate each card based on its position
+  const frontCard = getCardAtPosition(CARD_POSITIONS.FRONT)
+  const middleCard = getCardAtPosition(CARD_POSITIONS.MIDDLE)
+  const backCard = getCardAtPosition(CARD_POSITIONS.BACK)
+
+  if (frontCard) {
+    animateFrontCard(frontCard, rawProgress)
   }
-  
-  // Move other cards forward smoothly with easing
-  const middleCardIndex = cardOrder.value[1]
-  const backCardIndex = cardOrder.value[2]
-  const middleCardRef = middleCardIndex !== undefined ? allCardRefs[middleCardIndex] : null
-  const backCardRef = backCardIndex !== undefined ? allCardRefs[backCardIndex] : null
-  
-  if (middleCardRef?.value) {
-    const targetZ = rawProgress < 0.5 ? -0.18 : -0.18 + easeInOutCubic((rawProgress - 0.5) * 2) * 0.18
-    middleCardRef.value.position.z += (targetZ - middleCardRef.value.position.z) * delta * 10
-    
-    const targetRotY = rawProgress < 0.5 ? 0.15 : 0.15 - easeInOutCubic((rawProgress - 0.5) * 2) * 0.15
-    middleCardRef.value.rotation.y += (targetRotY - middleCardRef.value.rotation.y) * delta * 10
+
+  if (middleCard) {
+    animateMiddleCard(middleCard, rawProgress, delta)
   }
-  
-  if (backCardRef?.value) {
-    const targetZ = rawProgress < 0.5 ? -0.36 : -0.36 + easeInOutCubic((rawProgress - 0.5) * 2) * 0.18
-    backCardRef.value.position.z += (targetZ - backCardRef.value.position.z) * delta * 10
-    
-    const targetRotY = rawProgress < 0.5 ? -0.15 : -0.15 + easeInOutCubic((rawProgress - 0.5) * 2) * 0.3
-    backCardRef.value.rotation.y += (targetRotY - backCardRef.value.rotation.y) * delta * 10
+
+  if (backCard) {
+    animateBackCard(backCard, rawProgress, delta)
   }
-  
-  // Reset animation when complete
+
   if (rawProgress >= 1) {
-    // Rotate the order: front card goes to back
-    const frontCard = cardOrder.value.shift()!
-    cardOrder.value.push(frontCard)
-    
-    // Set final positions for all cards based on new order
-    cardOrder.value.forEach((cardIndex, positionIndex) => {
-      const cardRef = cardIndex !== undefined ? allCardRefs[cardIndex] : null
-      if (cardRef?.value && cards[positionIndex]) {
-        cardRef.value.position.set(...cards[positionIndex].basePosition)
-        cardRef.value.rotation.set(...cards[positionIndex].baseRotation)
-      }
-    })
-    
-    // Update card words array - shift words forward
-    cardWords.value.shift() // Remove front card word
-    // The card that went to the back gets the next new word
-    cardWords.value.push(words[nextWordIndex.value])
-    // Advance to next word
-    nextWordIndex.value = (nextWordIndex.value + 1) % words.length
-    
-    isAnimating.value = false
-    animationProgress.value = 0
-    
-    // Show text with a delay for smooth fade-in
-    setTimeout(() => {
-      showText.value = true
-    }, 100)
-    
-    console.log('Animation complete')
+    completeAnimation()
   }
 })
 
-// Expose nextCard function and cardWords for the button and text display
+// ============================================================================
+// PUBLIC API
+// ============================================================================
+
+/**
+ * Triggers the next card animation
+ */
+const nextCard = (): void => {
+  if (isAnimating.value) return
+
+  showText.value = false
+  isAnimating.value = true
+  animationProgress.value = 0
+}
+
 defineExpose({ nextCard, cardWords })
 </script>
 
 <template>
   <!-- Close-up perspective camera, like card in front of face -->
   <TresPerspectiveCamera
-    :position="[0, 0, 6]"
-    :fov="45"
-    :look-at="[0, 0, 0]"
+    :position="CAMERA.POSITION"
+    :fov="CAMERA.FOV"
+    :look-at="CAMERA.LOOK_AT"
   />
   <OrbitControls />
   
   <!-- Lighting for 3D depth -->
-  <TresAmbientLight :intensity="0.6" />
+  <TresAmbientLight :intensity="LIGHTING.AMBIENT_INTENSITY" />
   <TresDirectionalLight
-    :position="[5, 8, 5]"
-    :intensity="0.8"
+    :position="LIGHTING.PRIMARY_POSITION"
+    :intensity="LIGHTING.PRIMARY_INTENSITY"
     cast-shadow
   />
   <TresDirectionalLight
-    :position="[-3, 5, -3]"
-    :intensity="0.3"
+    :position="LIGHTING.SECONDARY_POSITION"
+    :intensity="LIGHTING.SECONDARY_INTENSITY"
   />
   
   <!-- Cards with rounded corners and text -->
   <TresGroup>
     <!-- Card 1 with text -->
-    <TresGroup 
-      ref="card1Ref"
-    >
-      <TresMesh
-        cast-shadow
-        :geometry="roundedGeometry"
-      >
+    <TresGroup ref="card1Ref">
+      <TresMesh cast-shadow :geometry="roundedGeometry">
         <TresMeshStandardMaterial
-          :color="cards[0]?.color || '#4ecdc4'"
-          :roughness="0.4"
-          :metalness="0.2"
+          :color="cards[0]?.color || CARD_COLORS.CARD_1"
+          :roughness="MATERIAL_PROPERTIES.ROUGHNESS"
+          :metalness="MATERIAL_PROPERTIES.METALNESS"
         />
       </TresMesh>
       <Html
-        v-if="card1Ref && Math.abs(card1Ref.position.z) < 0.1 && showText"
-        :position="[0, 0, 0.15]"
-        :rotation="[-Math.PI / 2, 0, 0]"
+        v-if="card1Ref && Math.abs(card1Ref.position.z) < HTML_TEXT.VISIBILITY_Z_THRESHOLD && showText"
+        :position="HTML_TEXT.POSITION"
+        :rotation="HTML_TEXT.ROTATION"
         transform
-        :distance-factor="0.5"
+        :distance-factor="HTML_TEXT.DISTANCE_FACTOR"
       >
         <div class="card-text">
           {{ card1Word }}
@@ -259,25 +494,20 @@ defineExpose({ nextCard, cardWords })
     </TresGroup>
     
     <!-- Card 2 with text -->
-    <TresGroup 
-      ref="card2Ref"
-    >
-      <TresMesh
-        cast-shadow
-        :geometry="roundedGeometry"
-      >
+    <TresGroup ref="card2Ref">
+      <TresMesh cast-shadow :geometry="roundedGeometry">
         <TresMeshStandardMaterial
-          :color="cards[1]?.color || '#ff6b6b'"
-          :roughness="0.4"
-          :metalness="0.2"
+          :color="cards[1]?.color || CARD_COLORS.CARD_2"
+          :roughness="MATERIAL_PROPERTIES.ROUGHNESS"
+          :metalness="MATERIAL_PROPERTIES.METALNESS"
         />
       </TresMesh>
       <Html
-        v-if="card2Ref && Math.abs(card2Ref.position.z) < 0.1 && showText"
-        :position="[0, 0, 0.15]"
-        :rotation="[-Math.PI / 2, 0, 0]"
+        v-if="card2Ref && Math.abs(card2Ref.position.z) < HTML_TEXT.VISIBILITY_Z_THRESHOLD && showText"
+        :position="HTML_TEXT.POSITION"
+        :rotation="HTML_TEXT.ROTATION"
         transform
-        :distance-factor="0.5"
+        :distance-factor="HTML_TEXT.DISTANCE_FACTOR"
       >
         <div class="card-text">
           {{ card2Word }}
@@ -286,25 +516,20 @@ defineExpose({ nextCard, cardWords })
     </TresGroup>
     
     <!-- Card 3 with text -->
-    <TresGroup 
-      ref="card3Ref"
-    >
-      <TresMesh
-        cast-shadow
-        :geometry="roundedGeometry"
-      >
+    <TresGroup ref="card3Ref">
+      <TresMesh cast-shadow :geometry="roundedGeometry">
         <TresMeshStandardMaterial
-          :color="cards[2]?.color || '#f7b731'"
-          :roughness="0.4"
-          :metalness="0.2"
+          :color="cards[2]?.color || CARD_COLORS.CARD_3"
+          :roughness="MATERIAL_PROPERTIES.ROUGHNESS"
+          :metalness="MATERIAL_PROPERTIES.METALNESS"
         />
       </TresMesh>
       <Html
-        v-if="card3Ref && Math.abs(card3Ref.position.z) < 0.1 && showText"
-        :position="[0, 0, 0.15]"
-        :rotation="[-Math.PI / 2, 0, 0]"
+        v-if="card3Ref && Math.abs(card3Ref.position.z) < HTML_TEXT.VISIBILITY_Z_THRESHOLD && showText"
+        :position="HTML_TEXT.POSITION"
+        :rotation="HTML_TEXT.ROTATION"
         transform
-        :distance-factor="0.5"
+        :distance-factor="HTML_TEXT.DISTANCE_FACTOR"
       >
         <div class="card-text">
           {{ card3Word }}
