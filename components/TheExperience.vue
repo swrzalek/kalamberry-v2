@@ -122,22 +122,26 @@ onBeforeRender(({ delta }) => {
   // Animate the front card - arc around the side of the deck
   if (frontCardRef?.value) {
     if (rawProgress < 0.5) {
-      // Phase 1: Move card to the right and slightly up (0 to 0.5)
+      // Phase 1: Move card to the right and up (0 to 0.5)
       const phase1Raw = rawProgress * 2
       const phase1Progress = easeInOutCubic(phase1Raw)
-      frontCardRef.value.position.x = phase1Progress * 5 // Move right
-      frontCardRef.value.position.y = phase1Progress * 0.5 // Just slightly up
-      frontCardRef.value.position.z = phase1Progress * 0.5 // Move forward a bit
+      frontCardRef.value.position.x = phase1Progress * 6 // Move right (increased from 5 to 6)
+      frontCardRef.value.position.y = phase1Progress * 1.5 // Move up more (increased from 0.5 to 1.5)
+      frontCardRef.value.position.z = phase1Progress * 1 // Move forward (increased from 0.5 to 1)
       frontCardRef.value.rotation.y = phase1Progress * 1.2
       frontCardRef.value.rotation.z = phase1Progress * 0.3
     } else {
-      // Phase 2: Continue around behind the deck (0.5 to 1)
+      // Phase 2: Arc wide around behind the deck (0.5 to 1)
       const phase2Raw = (rawProgress - 0.5) * 2
       const phase2Progress = easeInOutCubic(phase2Raw)
-      // Continue arc around to the back, moving behind the deck
-      frontCardRef.value.position.x = 5 - phase2Progress * 5 // Come back to center
-      frontCardRef.value.position.y = 0.5 - phase2Progress * 0.5 // Return to level
-      frontCardRef.value.position.z = 0.5 - phase2Progress * 0.86 // Go behind to z=-0.36
+      // Wide arc: stay out on X longer, maintain height, then swoop behind
+      const xArc = 6 - Math.pow(phase2Progress, 1.5) * 6 // Ease in slower on X, stay wide longer
+      const yArc = 1.5 * (1 - Math.pow(phase2Progress, 2)) // Stay elevated, drop at the end
+      const zArc = 1 - phase2Progress * 1.36 // Sweep behind to z=-0.36
+      
+      frontCardRef.value.position.x = xArc // Wide arc to center
+      frontCardRef.value.position.y = yArc // Stay elevated longer
+      frontCardRef.value.position.z = zArc // Go behind
       // Smoothly transition to the back card's rotation angle (-0.15)
       frontCardRef.value.rotation.y = 1.2 - phase2Progress * 1.35 // rotate back to -0.15
       frontCardRef.value.rotation.z = 0.3 - phase2Progress * 0.3
