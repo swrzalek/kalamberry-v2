@@ -84,6 +84,19 @@ const CAMERA = {
   LOOK_AT: [0, 0, 0] as [number, number, number],
 } as const
 
+const ORBIT_CONTROLS = {
+  DAMPING_FACTOR: 0.05,
+  ENABLE_DAMPING: true,
+  ROTATION_SPEED: 0.5,
+  MAX_POLAR_ANGLE: Math.PI / 2 + 0.3,
+  MIN_POLAR_ANGLE: Math.PI / 2 - 0.3,
+  MAX_AZIMUTH_ANGLE: 0.3,
+  MIN_AZIMUTH_ANGLE: -0.3,
+  ENABLE_ZOOM: false,
+  ENABLE_PAN: false,
+  SPRING_BACK_SPEED: 0.08,
+} as const
+
 const LIGHTING = {
   AMBIENT_INTENSITY: 0.6,
   PRIMARY_INTENSITY: 0.8,
@@ -227,6 +240,13 @@ const card3Ref = shallowRef<Group | null>(null)
 
 const allCardRefs = [card1Ref, card2Ref, card3Ref] as const
 
+// Camera and controls refs
+const cameraRef = shallowRef(null)
+const orbitControlsRef = shallowRef(null)
+
+// Track if user is currently interacting
+const isInteracting = ref(false)
+
 // Card configuration
 const cards: CardConfig[] = [
   {
@@ -276,6 +296,21 @@ const createCardWordComputed = (cardIndex: 0 | 1 | 2) => {
 const card1Word = createCardWordComputed(0)
 const card2Word = createCardWordComputed(1)
 const card3Word = createCardWordComputed(2)
+
+/**
+ * Computed properties to show text only on the front card
+ */
+const showCard1Text = computed(() => {
+  return showText.value && cardOrder.value[CARD_POSITIONS.FRONT] === 0
+})
+
+const showCard2Text = computed(() => {
+  return showText.value && cardOrder.value[CARD_POSITIONS.FRONT] === 1
+})
+
+const showCard3Text = computed(() => {
+  return showText.value && cardOrder.value[CARD_POSITIONS.FRONT] === 2
+})
 
 // ============================================================================
 // GEOMETRY
@@ -352,19 +387,19 @@ const animateBackCard = (backCardRef: Group, rawProgress: number, delta: number)
  * Resets animation and updates card order
  */
 const completeAnimation = (): void => {
-  // Rotate the order: front card goes to back
-  const frontCard = cardOrder.value.shift()!
-  cardOrder.value.push(frontCard)
-
-  // Set final positions for all cards based on new order
-  cardOrder.value.forEach((cardIndex, positionIndex) => {
+    // Rotate the order: front card goes to back
+    const frontCard = cardOrder.value.shift()!
+    cardOrder.value.push(frontCard)
+    
+    // Set final positions for all cards based on new order
+    cardOrder.value.forEach((cardIndex, positionIndex) => {
     const cardRef = allCardRefs[cardIndex]
-    if (cardRef?.value && cards[positionIndex]) {
-      cardRef.value.position.set(...cards[positionIndex].basePosition)
-      cardRef.value.rotation.set(...cards[positionIndex].baseRotation)
-    }
-  })
-
+      if (cardRef?.value && cards[positionIndex]) {
+        cardRef.value.position.set(...cards[positionIndex].basePosition)
+        cardRef.value.rotation.set(...cards[positionIndex].baseRotation)
+      }
+    })
+    
   // Update card words array
   cardWords.value.shift()
   const nextWord = WORDS[nextWordIndex.value]
@@ -374,12 +409,12 @@ const completeAnimation = (): void => {
   nextWordIndex.value = (nextWordIndex.value + 1) % WORDS.length
 
   // Reset animation state
-  isAnimating.value = false
-  animationProgress.value = 0
-
-  // Show text with a delay for smooth fade-in
-  setTimeout(() => {
-    showText.value = true
+    isAnimating.value = false
+    animationProgress.value = 0
+    
+    // Show text with a delay for smooth fade-in
+    setTimeout(() => {
+      showText.value = true
   }, ANIMATION.TEXT_FADE_DELAY)
 }
 
@@ -395,14 +430,78 @@ const getCardAtPosition = (position: number): Group | null => {
 // LIFECYCLE HOOKS
 // ============================================================================
 
+/**
+ * Handles when user starts dragging
+ */
+const onControlsStart = (): void => {
+  isInteracting.value = true
+}
+
+/**
+ * Handles when user stops dragging
+ */
+const onControlsEnd = (): void => {
+  isInteracting.value = false
+}
+
 onMounted(() => {
   initializeCardPositions()
+
+  // Set up orbit controls event listeners after next tick
+  nextTick(() => {
+    if (orbitControlsRef.value) {
+      const controls = orbitControlsRef.value as any
+      if (controls.addEventListener) {
+        controls.addEventListener('start', onControlsStart)
+        controls.addEventListener('end', onControlsEnd)
+      }
+    }
+  })
 })
+
+onUnmounted(() => {
+  // Clean up event listeners
+  if (orbitControlsRef.value) {
+    const controls = orbitControlsRef.value as any
+    if (controls.removeEventListener) {
+      controls.removeEventListener('start', onControlsStart)
+      controls.removeEventListener('end', onControlsEnd)
+    }
+  }
+})
+
+/**
+ * Springs the camera back to default position
+ */
+const springCameraBack = (delta: number): void => {
+  if (!cameraRef.value || isInteracting.value) return
+
+  const camera = cameraRef.value as any
+  const targetPosition = CAMERA.POSITION
+
+  // Smoothly interpolate camera position back to default
+  camera.position.x += (targetPosition[0] - camera.position.x) * ORBIT_CONTROLS.SPRING_BACK_SPEED
+  camera.position.y += (targetPosition[1] - camera.position.y) * ORBIT_CONTROLS.SPRING_BACK_SPEED
+  camera.position.z += (targetPosition[2] - camera.position.z) * ORBIT_CONTROLS.SPRING_BACK_SPEED
+
+  // Reset the orbit controls target if it exists
+  if (orbitControlsRef.value) {
+    const controls = orbitControlsRef.value as any
+    if (controls.target) {
+      controls.target.x += (0 - controls.target.x) * ORBIT_CONTROLS.SPRING_BACK_SPEED
+      controls.target.y += (0 - controls.target.y) * ORBIT_CONTROLS.SPRING_BACK_SPEED
+      controls.target.z += (0 - controls.target.z) * ORBIT_CONTROLS.SPRING_BACK_SPEED
+    }
+  }
+}
 
 /**
  * Main animation loop
  */
 onBeforeRender(({ delta }) => {
+  // Always apply spring-back effect when not interacting
+  springCameraBack(delta)
+
   if (!isAnimating.value) return
 
   animationProgress.value += delta * ANIMATION.SPEED_MULTIPLIER
@@ -451,11 +550,23 @@ defineExpose({ nextCard, cardWords })
 <template>
   <!-- Close-up perspective camera, like card in front of face -->
   <TresPerspectiveCamera
+    ref="cameraRef"
     :position="CAMERA.POSITION"
     :fov="CAMERA.FOV"
     :look-at="CAMERA.LOOK_AT"
   />
-  <OrbitControls />
+  <OrbitControls
+    ref="orbitControlsRef"
+    :enable-damping="ORBIT_CONTROLS.ENABLE_DAMPING"
+    :damping-factor="ORBIT_CONTROLS.DAMPING_FACTOR"
+    :rotation-speed="ORBIT_CONTROLS.ROTATION_SPEED"
+    :max-polar-angle="ORBIT_CONTROLS.MAX_POLAR_ANGLE"
+    :min-polar-angle="ORBIT_CONTROLS.MIN_POLAR_ANGLE"
+    :max-azimuth-angle="ORBIT_CONTROLS.MAX_AZIMUTH_ANGLE"
+    :min-azimuth-angle="ORBIT_CONTROLS.MIN_AZIMUTH_ANGLE"
+    :enable-zoom="ORBIT_CONTROLS.ENABLE_ZOOM"
+    :enable-pan="ORBIT_CONTROLS.ENABLE_PAN"
+  />
   
   <!-- Lighting for 3D depth -->
   <TresAmbientLight :intensity="LIGHTING.AMBIENT_INTENSITY" />
@@ -481,7 +592,7 @@ defineExpose({ nextCard, cardWords })
         />
       </TresMesh>
       <Html
-        v-if="card1Ref && Math.abs(card1Ref.position.z) < HTML_TEXT.VISIBILITY_Z_THRESHOLD && showText"
+        v-if="showCard1Text"
         :position="HTML_TEXT.POSITION"
         :rotation="HTML_TEXT.ROTATION"
         transform
@@ -503,7 +614,7 @@ defineExpose({ nextCard, cardWords })
         />
       </TresMesh>
       <Html
-        v-if="card2Ref && Math.abs(card2Ref.position.z) < HTML_TEXT.VISIBILITY_Z_THRESHOLD && showText"
+        v-if="showCard2Text"
         :position="HTML_TEXT.POSITION"
         :rotation="HTML_TEXT.ROTATION"
         transform
@@ -525,7 +636,7 @@ defineExpose({ nextCard, cardWords })
         />
       </TresMesh>
       <Html
-        v-if="card3Ref && Math.abs(card3Ref.position.z) < HTML_TEXT.VISIBILITY_Z_THRESHOLD && showText"
+        v-if="showCard3Text"
         :position="HTML_TEXT.POSITION"
         :rotation="HTML_TEXT.ROTATION"
         transform
