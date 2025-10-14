@@ -652,14 +652,14 @@ defineExpose({ nextCard, cardWords })
 
 <style scoped>
 .card-text {
-  font-size: 140px;
+  font-size: 11rem;
   font-weight: bold;
   color: white;
-  text-shadow: 0 0 20px rgba(0,0,0,0.8), 0 0 40px rgba(0,0,0,0.6);
   pointer-events: none;
   user-select: none;
   white-space: nowrap;
-  animation: fadeIn 0.5s ease-in;
+  animation: fadeIn 0.1s ease-in;
+  font-family: 'Bebas Neue', sans-serif;
 }
 
 @keyframes fadeIn {
