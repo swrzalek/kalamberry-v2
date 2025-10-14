@@ -34,12 +34,30 @@ const cards = [
   { ref: card3Ref, color: '#f7b731', basePosition: [0, 0, -0.36] as [number, number, number], baseRotation: [Math.PI / 2, -0.15, 0] as [number, number, number], wordIndex: 2 }
 ]
 
+// Track which card is in which position (front=0, middle=1, back=2)
+const cardOrder = ref([0, 1, 2]) // indices into [card1Ref, card2Ref, card3Ref]
+const allCardRefs = [card1Ref, card2Ref, card3Ref]
+
 // Reactive word assignments
 const cardWords = ref([
   words[0],
   words[1],
   words[2]
 ])
+
+// Computed properties to get the word for each card based on its position in the order
+const card1Word = computed(() => {
+  const positionIndex = cardOrder.value.indexOf(0) // Find where card 0 is in the order
+  return cardWords.value[positionIndex]
+})
+const card2Word = computed(() => {
+  const positionIndex = cardOrder.value.indexOf(1)
+  return cardWords.value[positionIndex]
+})
+const card3Word = computed(() => {
+  const positionIndex = cardOrder.value.indexOf(2)
+  return cardWords.value[positionIndex]
+})
 
 const isAnimating = ref(false)
 const animationProgress = ref(0)
@@ -54,6 +72,22 @@ const easeInOutCubic = (t: number): number => {
 
 // Create rounded box geometry for the card (width, thickness, height)
 const roundedGeometry = new RoundedBoxGeometry(2.5, 0.2, 3.5, 3, 0.08)
+
+// Initialize card positions on mount
+onMounted(() => {
+  if (card1Ref.value && cards[0]) {
+    card1Ref.value.position.set(...cards[0].basePosition)
+    card1Ref.value.rotation.set(...cards[0].baseRotation)
+  }
+  if (card2Ref.value && cards[1]) {
+    card2Ref.value.position.set(...cards[1].basePosition)
+    card2Ref.value.rotation.set(...cards[1].baseRotation)
+  }
+  if (card3Ref.value && cards[2]) {
+    card3Ref.value.position.set(...cards[2].basePosition)
+    card3Ref.value.rotation.set(...cards[2].baseRotation)
+  }
+})
 
 // Animation function
 const nextCard = () => {
@@ -79,68 +113,73 @@ onBeforeRender(({ delta }) => {
   const rawProgress = Math.min(animationProgress.value, 1)
   const progress = easeInOutCubic(rawProgress) // Apply easing
   
-  console.log('Animating, progress:', progress.toFixed(2), 'card1:', !!card1Ref.value)
+  console.log('Animating, progress:', progress.toFixed(2))
   
-  // Animate the top card (card1)
-  if (card1Ref.value) {
+  // Get the card that's currently in front position
+  const frontCardIndex = cardOrder.value[0]
+  const frontCardRef = frontCardIndex !== undefined ? allCardRefs[frontCardIndex] : null
+  
+  // Animate the front card - arc around the side of the deck
+  if (frontCardRef?.value) {
     if (rawProgress < 0.5) {
-      // Phase 1: Move card out to the right (0 to 0.5)
+      // Phase 1: Move card to the right and slightly up (0 to 0.5)
       const phase1Raw = rawProgress * 2
       const phase1Progress = easeInOutCubic(phase1Raw)
-      card1Ref.value.position.x = phase1Progress * 5
-      card1Ref.value.position.z = phase1Progress * 2
-      card1Ref.value.rotation.y = phase1Progress * 1
-      card1Ref.value.rotation.z = phase1Progress * 0.3
+      frontCardRef.value.position.x = phase1Progress * 5 // Move right
+      frontCardRef.value.position.y = phase1Progress * 0.5 // Just slightly up
+      frontCardRef.value.position.z = phase1Progress * 0.5 // Move forward a bit
+      frontCardRef.value.rotation.y = phase1Progress * 1.2
+      frontCardRef.value.rotation.z = phase1Progress * 0.3
     } else {
-      // Phase 2: Move card to back from left (0.5 to 1)
+      // Phase 2: Continue around behind the deck (0.5 to 1)
       const phase2Raw = (rawProgress - 0.5) * 2
       const phase2Progress = easeInOutCubic(phase2Raw)
-      card1Ref.value.position.x = 5 - phase2Progress * 10 + phase2Progress * 5 // right to left to center-back
-      card1Ref.value.position.z = 2 - phase2Progress * 2.36 // move to back position
+      // Continue arc around to the back, moving behind the deck
+      frontCardRef.value.position.x = 5 - phase2Progress * 5 // Come back to center
+      frontCardRef.value.position.y = 0.5 - phase2Progress * 0.5 // Return to level
+      frontCardRef.value.position.z = 0.5 - phase2Progress * 0.86 // Go behind to z=-0.36
       // Smoothly transition to the back card's rotation angle (-0.15)
-      card1Ref.value.rotation.y = 1 - phase2Progress * 1.15 // rotate back to -0.15
-      card1Ref.value.rotation.z = 0.3 - phase2Progress * 0.3
+      frontCardRef.value.rotation.y = 1.2 - phase2Progress * 1.35 // rotate back to -0.15
+      frontCardRef.value.rotation.z = 0.3 - phase2Progress * 0.3
     }
   }
   
   // Move other cards forward smoothly with easing
-  if (card2Ref.value) {
+  const middleCardIndex = cardOrder.value[1]
+  const backCardIndex = cardOrder.value[2]
+  const middleCardRef = middleCardIndex !== undefined ? allCardRefs[middleCardIndex] : null
+  const backCardRef = backCardIndex !== undefined ? allCardRefs[backCardIndex] : null
+  
+  if (middleCardRef?.value) {
     const targetZ = rawProgress < 0.5 ? -0.18 : -0.18 + easeInOutCubic((rawProgress - 0.5) * 2) * 0.18
-    card2Ref.value.position.z += (targetZ - card2Ref.value.position.z) * delta * 10
+    middleCardRef.value.position.z += (targetZ - middleCardRef.value.position.z) * delta * 10
     
     const targetRotY = rawProgress < 0.5 ? 0.15 : 0.15 - easeInOutCubic((rawProgress - 0.5) * 2) * 0.15
-    card2Ref.value.rotation.y += (targetRotY - card2Ref.value.rotation.y) * delta * 10
+    middleCardRef.value.rotation.y += (targetRotY - middleCardRef.value.rotation.y) * delta * 10
   }
   
-  if (card3Ref.value) {
+  if (backCardRef?.value) {
     const targetZ = rawProgress < 0.5 ? -0.36 : -0.36 + easeInOutCubic((rawProgress - 0.5) * 2) * 0.18
-    card3Ref.value.position.z += (targetZ - card3Ref.value.position.z) * delta * 10
+    backCardRef.value.position.z += (targetZ - backCardRef.value.position.z) * delta * 10
     
     const targetRotY = rawProgress < 0.5 ? -0.15 : -0.15 + easeInOutCubic((rawProgress - 0.5) * 2) * 0.3
-    card3Ref.value.rotation.y += (targetRotY - card3Ref.value.rotation.y) * delta * 10
+    backCardRef.value.rotation.y += (targetRotY - backCardRef.value.rotation.y) * delta * 10
   }
   
   // Reset animation when complete
   if (rawProgress >= 1) {
-    // Set final positions and rotations
-    if (card1Ref.value && cards[2]) {
-      card1Ref.value.position.set(...cards[2].basePosition)
-      card1Ref.value.rotation.set(...cards[2].baseRotation)
-    }
-    if (card2Ref.value && cards[0]) {
-      card2Ref.value.position.set(...cards[0].basePosition)
-      card2Ref.value.rotation.set(...cards[0].baseRotation)
-    }
-    if (card3Ref.value && cards[1]) {
-      card3Ref.value.position.set(...cards[1].basePosition)
-      card3Ref.value.rotation.set(...cards[1].baseRotation)
-    }
+    // Rotate the order: front card goes to back
+    const frontCard = cardOrder.value.shift()!
+    cardOrder.value.push(frontCard)
     
-    // Swap card references to maintain order
-    const temp = card1Ref.value
-    card1Ref.value = card2Ref.value
-    card2Ref.value = card3Ref.value
-    card3Ref.value = temp
+    // Set final positions for all cards based on new order
+    cardOrder.value.forEach((cardIndex, positionIndex) => {
+      const cardRef = cardIndex !== undefined ? allCardRefs[cardIndex] : null
+      if (cardRef?.value && cards[positionIndex]) {
+        cardRef.value.position.set(...cards[positionIndex].basePosition)
+        cardRef.value.rotation.set(...cards[positionIndex].baseRotation)
+      }
+    })
     
     // Update card words array - shift words forward
     cardWords.value.shift() // Remove front card word
@@ -191,8 +230,6 @@ defineExpose({ nextCard, cardWords })
     <!-- Card 1 with text -->
     <TresGroup 
       ref="card1Ref"
-      :position="cards[0]?.basePosition || [0, 0, 0]"
-      :rotation="cards[0]?.baseRotation || [0, 0, 0]"
     >
       <TresMesh
         cast-shadow
@@ -212,7 +249,7 @@ defineExpose({ nextCard, cardWords })
         :distance-factor="0.5"
       >
         <div class="card-text">
-          {{ cardWords[0] }}
+          {{ card1Word }}
         </div>
       </Html>
     </TresGroup>
@@ -220,8 +257,6 @@ defineExpose({ nextCard, cardWords })
     <!-- Card 2 with text -->
     <TresGroup 
       ref="card2Ref"
-      :position="cards[1]?.basePosition || [0, 0, -0.18]"
-      :rotation="cards[1]?.baseRotation || [Math.PI / 2, 0.15, 0]"
     >
       <TresMesh
         cast-shadow
@@ -241,7 +276,7 @@ defineExpose({ nextCard, cardWords })
         :distance-factor="0.5"
       >
         <div class="card-text">
-          {{ cardWords[1] }}
+          {{ card2Word }}
         </div>
       </Html>
     </TresGroup>
@@ -249,8 +284,6 @@ defineExpose({ nextCard, cardWords })
     <!-- Card 3 with text -->
     <TresGroup 
       ref="card3Ref"
-      :position="cards[2]?.basePosition || [0, 0, -0.36]"
-      :rotation="cards[2]?.baseRotation || [Math.PI / 2, -0.15, 0]"
     >
       <TresMesh
         cast-shadow
@@ -270,7 +303,7 @@ defineExpose({ nextCard, cardWords })
         :distance-factor="0.5"
       >
         <div class="card-text">
-          {{ cardWords[2] }}
+          {{ card3Word }}
         </div>
       </Html>
     </TresGroup>
