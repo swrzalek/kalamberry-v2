@@ -43,6 +43,7 @@ const cardWords = ref([
 
 const isAnimating = ref(false)
 const animationProgress = ref(0)
+const showText = ref(true)
 
 // Easing function for smooth animation (ease-in-out)
 const easeInOutCubic = (t: number): number => {
@@ -58,6 +59,9 @@ const roundedGeometry = new RoundedBoxGeometry(2.5, 0.2, 3.5, 3, 0.08)
 const nextCard = () => {
   console.log('nextCard called!', isAnimating.value)
   if (isAnimating.value) return
+  
+  // Hide text immediately
+  showText.value = false
   
   isAnimating.value = true
   animationProgress.value = 0
@@ -147,6 +151,12 @@ onBeforeRender(({ delta }) => {
     
     isAnimating.value = false
     animationProgress.value = 0
+    
+    // Show text with a delay for smooth fade-in
+    setTimeout(() => {
+      showText.value = true
+    }, 100)
+    
     console.log('Animation complete')
   }
 })
@@ -195,6 +205,7 @@ defineExpose({ nextCard, cardWords })
         />
       </TresMesh>
       <Html
+        v-if="card1Ref && Math.abs(card1Ref.position.z) < 0.1 && showText"
         :position="[0, 0, 0.15]"
         :rotation="[-Math.PI / 2, 0, 0]"
         transform
@@ -223,6 +234,7 @@ defineExpose({ nextCard, cardWords })
         />
       </TresMesh>
       <Html
+        v-if="card2Ref && Math.abs(card2Ref.position.z) < 0.1 && showText"
         :position="[0, 0, 0.15]"
         :rotation="[-Math.PI / 2, 0, 0]"
         transform
@@ -251,6 +263,7 @@ defineExpose({ nextCard, cardWords })
         />
       </TresMesh>
       <Html
+        v-if="card3Ref && Math.abs(card3Ref.position.z) < 0.1 && showText"
         :position="[0, 0, 0.15]"
         :rotation="[-Math.PI / 2, 0, 0]"
         transform
@@ -266,12 +279,24 @@ defineExpose({ nextCard, cardWords })
 
 <style scoped>
 .card-text {
-  font-size: 48px;
+  font-size: 140px;
   font-weight: bold;
   color: white;
   text-shadow: 0 0 20px rgba(0,0,0,0.8), 0 0 40px rgba(0,0,0,0.6);
   pointer-events: none;
   user-select: none;
   white-space: nowrap;
+  animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 </style>
