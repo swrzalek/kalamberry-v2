@@ -711,7 +711,10 @@ defineExpose({ nextCard, cardWords })
   color: white;
   pointer-events: none;
   user-select: none;
-  white-space: nowrap;
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 80rem;
   animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
   letter-spacing: 0.02em;
@@ -722,6 +725,7 @@ defineExpose({ nextCard, cardWords })
   line-height: 1.1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  padding: 2rem 4rem;
 }
 
 @keyframes fadeIn {
