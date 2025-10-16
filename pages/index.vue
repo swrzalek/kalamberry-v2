@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import wordsByDifficulty from '~/data/words.json'
+
 // Page metadata
 useHead({
   title: 'TresJS Card Deck',
@@ -6,13 +8,6 @@ useHead({
     { name: 'description', content: 'A TresJS Nuxt application' }
   ]
 })
-
-// Words by difficulty
-const wordsByDifficulty = {
-  easy: ['Cat', 'Dog', 'Sun', 'Car', 'Ball', 'Tree', 'Book', 'Star', 'Fish', 'Bird'],
-  medium: ['Hello', 'World', 'Vue', 'TresJS', 'Three.js', 'Animation', 'Cards', 'Deck', 'Shuffle', 'Amazing'],
-  hard: ['JavaScript', 'TypeScript', 'Component', 'Framework', 'Algorithm', 'Architecture', 'Performance', 'Optimization', 'Development', 'Engineering']
-}
 
 // State management
 const currentDifficulty = ref<'easy' | 'medium' | 'hard'>('medium')
