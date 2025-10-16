@@ -80,7 +80,7 @@ const CARD_ROTATIONS = {
 
 const CAMERA = {
   POSITION: [0, 0, 6] as [number, number, number],
-  FOV: 45,
+  FOV: 40,
   LOOK_AT: [0, 0, 0] as [number, number, number],
 } as const
 
