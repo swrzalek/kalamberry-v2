@@ -20,17 +20,13 @@ const handleDifficultyChange = (difficulty: 'easy' | 'medium' | 'hard') => {
 </script>
 
 <template>
-  <div class="relative w-full h-screen main">
+  <div class="main">
     <div class="navigation">
       <TheNavigation @next="handleNext" @difficulty-change="handleDifficultyChange" />
     </div>
-    <div class="container">
-      <TresCanvas
-          clear-color="#020420"
-      >
-        <TheExperience ref="experienceRef" />
-      </TresCanvas>
-    </div>
+    <TresCanvas clear-color="#020420">
+      <TheExperience ref="experienceRef" />
+    </TresCanvas>
   </div>
 </template>
 
@@ -41,21 +37,20 @@ button {
 }
 
 .main {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  background: #020420;
+  position: relative;
+  width: 100%;
   height: 100vh;
+  background: #020420;
 }
+
 .navigation {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
   height: 5rem;
   width: 40rem;
   border-radius: 1rem;
-  backdrop-filter: blur(10px);
-}
-.container {
-  width: 40rem;
-  height: 40rem;
+  z-index: 10;
 }
 </style>
