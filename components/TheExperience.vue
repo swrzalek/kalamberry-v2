@@ -99,17 +99,17 @@ const ORBIT_CONTROLS = {
 } as const
 
 const LIGHTING = {
-  AMBIENT_INTENSITY: 0.6,
-  PRIMARY_INTENSITY: 0.8,
-  SECONDARY_INTENSITY: 0.3,
+  AMBIENT_INTENSITY: 0.8,
+  PRIMARY_INTENSITY: 1.2,
+  SECONDARY_INTENSITY: 0.5,
   PRIMARY_POSITION: [5, 8, 5] as [number, number, number],
   SECONDARY_POSITION: [-3, 5, -3] as [number, number, number],
 } as const
 
 const CARD_COLORS = {
-  CARD_1: '#4ecdc4',
-  CARD_2: '#ff6b6b',
-  CARD_3: '#f7b731',
+  CARD_1: '#9333ea', // Rich Purple 600
+  CARD_2: '#a855f7', // Rich Purple 500
+  CARD_3: '#c084fc', // Rich Purple 400
 } as const
 
 const MATERIAL_PROPERTIES = {
@@ -693,23 +693,33 @@ defineExpose({ nextCard, cardWords })
 <style scoped>
 .card-text {
   font-size: 11rem;
-  font-weight: bold;
+  font-weight: 700;
   color: white;
   pointer-events: none;
   user-select: none;
   white-space: nowrap;
-  animation: fadeIn 0.1s ease-in;
-  font-family: 'Bebas Neue', sans-serif;
+  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+  letter-spacing: 0.02em;
+  text-shadow: 
+    0 2px 10px rgba(0, 0, 0, 0.3),
+    0 4px 20px rgba(0, 0, 0, 0.2),
+    0 8px 40px rgba(0, 0, 0, 0.1);
+  line-height: 1.1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: scale(0.8);
+    transform: scale(0.95) translateY(10px);
+    filter: blur(4px);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: scale(1) translateY(0);
+    filter: blur(0);
   }
 }
 </style>
