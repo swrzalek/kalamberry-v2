@@ -46,7 +46,8 @@ const CARD_SPACING = {
 const ANIMATION = {
   SPEED_MULTIPLIER: 1.5,
   TRANSITION_SMOOTH_FACTOR: 10,
-  TEXT_FADE_DELAY: 100,
+  TEXT_FADE_OUT_DELAY: 500,
+  TEXT_SHOW_PROGRESS: 0.6, // Show new text when card is 60% through animation
   PHASE_SPLIT: 0.5,
 } as const
 
@@ -232,6 +233,7 @@ const nextWordIndex = ref(INITIAL_VISIBLE_CARDS_COUNT)
 const isAnimating = ref(false)
 const animationProgress = ref(0)
 const showText = ref(true)
+const showNewText = ref(false)
 
 // Card refs - using shallowRef as recommended by TresJS docs
 const card1Ref = shallowRef<Group | null>(null)
@@ -299,17 +301,48 @@ const card3Word = createCardWordComputed(2)
 
 /**
  * Computed properties to show text only on the front card
+ * During animation (after text show point), show text on the middle card that's moving to front
  */
 const showCard1Text = computed(() => {
-  return showText.value && cardOrder.value[CARD_POSITIONS.FRONT] === 0
+  // During animation, show new text on middle card (incoming card)
+  if (isAnimating.value && showNewText.value) {
+    return cardOrder.value[CARD_POSITIONS.MIDDLE] === 0
+  }
+  
+  // Normal state: show text on front card
+  if (!isAnimating.value && showText.value) {
+    return cardOrder.value[CARD_POSITIONS.FRONT] === 0
+  }
+  
+  return false
 })
 
 const showCard2Text = computed(() => {
-  return showText.value && cardOrder.value[CARD_POSITIONS.FRONT] === 1
+  // During animation, show new text on middle card (incoming card)
+  if (isAnimating.value && showNewText.value) {
+    return cardOrder.value[CARD_POSITIONS.MIDDLE] === 1
+  }
+  
+  // Normal state: show text on front card
+  if (!isAnimating.value && showText.value) {
+    return cardOrder.value[CARD_POSITIONS.FRONT] === 1
+  }
+  
+  return false
 })
 
 const showCard3Text = computed(() => {
-  return showText.value && cardOrder.value[CARD_POSITIONS.FRONT] === 2
+  // During animation, show new text on middle card (incoming card)
+  if (isAnimating.value && showNewText.value) {
+    return cardOrder.value[CARD_POSITIONS.MIDDLE] === 2
+  }
+  
+  // Normal state: show text on front card
+  if (!isAnimating.value && showText.value) {
+    return cardOrder.value[CARD_POSITIONS.FRONT] === 2
+  }
+  
+  return false
 })
 
 // ============================================================================
@@ -400,22 +433,19 @@ const completeAnimation = (): void => {
       }
     })
     
-  // Update card words array
-  cardWords.value.shift()
-  const nextWord = WORDS[nextWordIndex.value]
-  if (nextWord) {
-    cardWords.value.push(nextWord)
-  }
-  nextWordIndex.value = (nextWordIndex.value + 1) % WORDS.length
+    // Update card words array AFTER card order changes
+    cardWords.value.shift()
+    const nextWord = WORDS[nextWordIndex.value]
+    if (nextWord) {
+      cardWords.value.push(nextWord)
+    }
+    nextWordIndex.value = (nextWordIndex.value + 1) % WORDS.length
 
   // Reset animation state
     isAnimating.value = false
     animationProgress.value = 0
-    
-    // Show text with a delay for smooth fade-in
-    setTimeout(() => {
-      showText.value = true
-  }, ANIMATION.TEXT_FADE_DELAY)
+    showNewText.value = false
+    showText.value = true
 }
 
 /**
@@ -507,6 +537,11 @@ onBeforeRender(({ delta }) => {
   animationProgress.value += delta * ANIMATION.SPEED_MULTIPLIER
   const rawProgress = normalizeProgress(animationProgress.value)
 
+  // Show new text on middle card when it's moving into view
+  if (rawProgress >= ANIMATION.TEXT_SHOW_PROGRESS && !showNewText.value) {
+    showNewText.value = true
+  }
+
   // Animate each card based on its position
   const frontCard = getCardAtPosition(CARD_POSITIONS.FRONT)
   const middleCard = getCardAtPosition(CARD_POSITIONS.MIDDLE)
@@ -539,9 +574,14 @@ onBeforeRender(({ delta }) => {
 const nextCard = (): void => {
   if (isAnimating.value) return
 
-  showText.value = false
+  // Delay hiding the old text
+  setTimeout(() => {
+    showText.value = false
+  }, ANIMATION.TEXT_FADE_OUT_DELAY)
+  
   isAnimating.value = true
   animationProgress.value = 0
+  showNewText.value = false
 }
 
 defineExpose({ nextCard, cardWords })
