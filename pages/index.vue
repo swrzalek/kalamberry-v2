@@ -7,6 +7,17 @@ useHead({
   ]
 })
 
+// Words by difficulty
+const wordsByDifficulty = {
+  easy: ['Cat', 'Dog', 'Sun', 'Car', 'Ball', 'Tree', 'Book', 'Star', 'Fish', 'Bird'],
+  medium: ['Hello', 'World', 'Vue', 'TresJS', 'Three.js', 'Animation', 'Cards', 'Deck', 'Shuffle', 'Amazing'],
+  hard: ['JavaScript', 'TypeScript', 'Component', 'Framework', 'Algorithm', 'Architecture', 'Performance', 'Optimization', 'Development', 'Engineering']
+}
+
+// State management
+const currentDifficulty = ref<'easy' | 'medium' | 'hard'>('medium')
+const currentWords = computed(() => wordsByDifficulty[currentDifficulty.value])
+
 const experienceRef = ref<{ nextCard: () => void } | null>(null)
 
 const handleNext = () => {
@@ -14,8 +25,7 @@ const handleNext = () => {
 }
 
 const handleDifficultyChange = (difficulty: 'easy' | 'medium' | 'hard') => {
-  console.log('Difficulty changed to:', difficulty)
-  // Add your difficulty logic here
+  currentDifficulty.value = difficulty
 }
 </script>
 
@@ -25,7 +35,7 @@ const handleDifficultyChange = (difficulty: 'easy' | 'medium' | 'hard') => {
       <TheNavigation @next="handleNext" @difficulty-change="handleDifficultyChange" />
     </div>
     <TresCanvas clear-color="#020420">
-      <TheExperience ref="experienceRef" />
+      <TheExperience ref="experienceRef" :words="currentWords" />
     </TresCanvas>
   </div>
 </template>

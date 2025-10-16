@@ -124,20 +124,17 @@ const HTML_TEXT = {
   VISIBILITY_Z_THRESHOLD: 0.1,
 } as const
 
-const WORDS = [
-  'Hello',
-  'World',
-  'Vue',
-  'TresJS',
-  'Three.js',
-  'Animation',
-  'Cards',
-  'Deck',
-  'Shuffle',
-  'Amazing',
-] as const
-
 const INITIAL_VISIBLE_CARDS_COUNT = 3
+
+// ============================================================================
+// PROPS
+// ============================================================================
+
+const props = withDefaults(defineProps<{
+  words?: string[]
+}>(), {
+  words: () => ['Hello', 'World', 'Vue', 'TresJS', 'Three.js', 'Animation', 'Cards', 'Deck', 'Shuffle', 'Amazing']
+})
 
 // ============================================================================
 // COMPOSABLES & UTILS
@@ -281,8 +278,12 @@ const cardOrder = ref([
   CARD_POSITIONS.BACK,
 ])
 
-// Reactive word assignments
-const cardWords = ref<string[]>([WORDS[0], WORDS[1], WORDS[2]])
+// Reactive word assignments - initialize with words from props
+const cardWords = ref<string[]>([
+  props.words[0] ?? '',
+  props.words[1] ?? '',
+  props.words[2] ?? ''
+])
 
 // ============================================================================
 // COMPUTED PROPERTIES
@@ -435,11 +436,11 @@ const completeAnimation = (): void => {
     
     // Update card words array AFTER card order changes
     cardWords.value.shift()
-    const nextWord = WORDS[nextWordIndex.value]
+    const nextWord = props.words[nextWordIndex.value]
     if (nextWord) {
       cardWords.value.push(nextWord)
     }
-    nextWordIndex.value = (nextWordIndex.value + 1) % WORDS.length
+    nextWordIndex.value = (nextWordIndex.value + 1) % props.words.length
 
   // Reset animation state
     isAnimating.value = false
@@ -583,6 +584,19 @@ const nextCard = (): void => {
   animationProgress.value = 0
   showNewText.value = false
 }
+
+// Watch for words prop changes (when difficulty changes)
+watch(() => props.words, (newWords) => {
+  if (isAnimating.value) return
+  
+  // Reset to first 3 words from new difficulty
+  nextWordIndex.value = INITIAL_VISIBLE_CARDS_COUNT
+  cardWords.value = [
+    newWords[0] ?? '',
+    newWords[1] ?? '',
+    newWords[2] ?? ''
+  ]
+}, { deep: true })
 
 defineExpose({ nextCard, cardWords })
 </script>
