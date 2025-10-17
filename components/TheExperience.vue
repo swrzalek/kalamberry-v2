@@ -81,7 +81,9 @@ const CARD_ROTATIONS = {
 
 const CAMERA = {
   POSITION: [0, 0, 6] as [number, number, number],
+  POSITION_MOBILE: [0, -0.8, 6] as [number, number, number],
   FOV: 50,
+  FOV_MOBILE: 54,
   LOOK_AT: [0, 0, 0] as [number, number, number],
 } as const
 
@@ -231,6 +233,11 @@ const isAnimating = ref(false)
 const animationProgress = ref(0)
 const showText = ref(true)
 const showNewText = ref(false)
+
+// Responsive FOV and position based on screen size
+const isMobile = ref(false)
+const currentFOV = computed(() => isMobile.value ? CAMERA.FOV_MOBILE : CAMERA.FOV)
+const currentCameraPosition = computed(() => isMobile.value ? CAMERA.POSITION_MOBILE : CAMERA.POSITION)
 
 // Card refs - using shallowRef as recommended by TresJS docs
 const card1Ref = shallowRef<Group | null>(null)
@@ -478,6 +485,13 @@ const onControlsEnd = (): void => {
 onMounted(() => {
   initializeCardPositions()
 
+  // Check if mobile on mount and add resize listener
+  const checkMobile = () => {
+    isMobile.value = window.innerWidth <= 768
+  }
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
+
   // Set up orbit controls event listeners after next tick
   nextTick(() => {
     if (orbitControlsRef.value) {
@@ -487,6 +501,11 @@ onMounted(() => {
         controls.addEventListener('end', onControlsEnd)
       }
     }
+  })
+
+  // Clean up resize listener
+  onUnmounted(() => {
+    window.removeEventListener('resize', checkMobile)
   })
 })
 
@@ -508,7 +527,7 @@ const springCameraBack = (delta: number): void => {
   if (!cameraRef.value || isInteracting.value) return
 
   const camera = cameraRef.value as any
-  const targetPosition = CAMERA.POSITION
+  const targetPosition = isMobile.value ? CAMERA.POSITION_MOBILE : CAMERA.POSITION
 
   // Smoothly interpolate camera position back to default
   camera.position.x += (targetPosition[0] - camera.position.x) * ORBIT_CONTROLS.SPRING_BACK_SPEED
@@ -605,8 +624,8 @@ defineExpose({ nextCard, cardWords })
   <!-- Close-up perspective camera, like card in front of face -->
   <TresPerspectiveCamera
     ref="cameraRef"
-    :position="CAMERA.POSITION"
-    :fov="CAMERA.FOV"
+    :position="currentCameraPosition"
+    :fov="currentFOV"
     :look-at="CAMERA.LOOK_AT"
   />
   <OrbitControls

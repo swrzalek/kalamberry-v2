@@ -60,7 +60,7 @@ const handleNext = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 2rem;
+  gap: clamp(0.5rem, 3vw, 2rem);
   color: white;
 }
 
@@ -74,16 +74,17 @@ const handleNext = () => {
 }
 
 .difficulty-btn {
-  padding: 0.625rem 1.5rem;
+  padding: 0.75rem clamp(0.875rem, 2vw, 1.75rem);
   background: transparent;
   border: none;
   color: rgba(255, 255, 255, 0.7);
-  font-size: 0.95rem;
+  font-size: clamp(0.8rem, 2vw, 1.05rem);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.3s ease;
   border-radius: 0.5rem;
   position: relative;
+  white-space: nowrap;
 }
 
 .difficulty-btn:hover {
@@ -99,7 +100,7 @@ const handleNext = () => {
 
 .divider {
   width: 1px;
-  height: 2rem;
+  height: 2.25rem;
   background: linear-gradient(
     to bottom,
     transparent,
@@ -109,16 +110,17 @@ const handleNext = () => {
 }
 
 .next-btn {
-  padding: 0.625rem 2rem;
+  padding: 0.75rem clamp(1.25rem, 3vw, 2.25rem);
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
   color: white;
-  font-size: 0.95rem;
+  font-size: clamp(0.8rem, 2vw, 1.05rem);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.3s ease;
   border-radius: 0.75rem;
   backdrop-filter: blur(10px);
+  white-space: nowrap;
 }
 
 .next-btn:hover {
@@ -130,6 +132,54 @@ const handleNext = () => {
 
 .next-btn:active {
   transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+  .nav-content {
+    gap: 0.65rem;
+  }
+  
+  .button-group {
+    padding: 0.3rem;
+  }
+  
+  .difficulty-btn {
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
+  }
+  
+  .next-btn {
+    padding: 0.75rem 1.35rem;
+    font-size: 0.95rem;
+  }
+  
+  .divider {
+    height: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .nav-content {
+    gap: 0.5rem;
+  }
+  
+  .button-group {
+    padding: 0.25rem;
+  }
+  
+  .difficulty-btn {
+    padding: 0.65rem 0.85rem;
+    font-size: 0.875rem;
+  }
+  
+  .next-btn {
+    padding: 0.65rem 1.1rem;
+    font-size: 0.875rem;
+  }
+  
+  .divider {
+    height: 1.85rem;
+  }
 }
 </style>
 
