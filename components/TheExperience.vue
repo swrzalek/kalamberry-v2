@@ -59,6 +59,12 @@ const CARD_POSITIONS = {
 
 const MOBILE_Y_OFFSET = 0.3 // Move cards up on mobile - adjust this value to control vertical position
 
+const SWIPE = {
+  MIN_DISTANCE: 50, // Minimum swipe distance in pixels
+  MAX_TIME: 300, // Maximum time for a swipe in ms
+  MAX_VERTICAL_DISTANCE: 100, // Maximum vertical movement allowed for horizontal swipe
+} as const
+
 const ARC_ANIMATION = {
   PHASE1: {
     X_DISTANCE: 6,
@@ -256,6 +262,11 @@ const orbitControlsRef = shallowRef(null)
 
 // Track if user is currently interacting
 const isInteracting = ref(false)
+
+// Touch/swipe state
+const touchStartX = ref(0)
+const touchStartY = ref(0)
+const touchStartTime = ref(0)
 
 // Card configuration
 const cards: CardConfig[] = [
@@ -494,6 +505,39 @@ const onControlsEnd = (): void => {
   isInteracting.value = false
 }
 
+/**
+ * Handles touch start for swipe detection
+ */
+const onTouchStart = (event: TouchEvent): void => {
+  if (!isMobile.value) return
+  
+  const touch = event.touches[0]
+  touchStartX.value = touch.clientX
+  touchStartY.value = touch.clientY
+  touchStartTime.value = Date.now()
+}
+
+/**
+ * Handles touch end and detects swipe gesture
+ */
+const onTouchEnd = (event: TouchEvent): void => {
+  if (!isMobile.value || isAnimating.value) return
+  
+  const touch = event.changedTouches[0]
+  const deltaX = touch.clientX - touchStartX.value
+  const deltaY = touch.clientY - touchStartY.value
+  const deltaTime = Date.now() - touchStartTime.value
+  
+  // Check if it's a valid left swipe
+  const isLeftSwipe = deltaX < -SWIPE.MIN_DISTANCE
+  const isHorizontal = Math.abs(deltaY) < SWIPE.MAX_VERTICAL_DISTANCE
+  const isFastEnough = deltaTime < SWIPE.MAX_TIME
+  
+  if (isLeftSwipe && isHorizontal && isFastEnough) {
+    nextCard()
+  }
+}
+
 onMounted(() => {
   // Check if mobile FIRST before initializing positions
   const checkMobile = () => {
@@ -510,6 +554,10 @@ onMounted(() => {
   initializeCardPositions()
   
   window.addEventListener('resize', checkMobile)
+  
+  // Add touch event listeners for swipe detection
+  window.addEventListener('touchstart', onTouchStart, { passive: true })
+  window.addEventListener('touchend', onTouchEnd, { passive: true })
 
   // Set up orbit controls event listeners after next tick
   nextTick(() => {
@@ -525,6 +573,8 @@ onMounted(() => {
   // Clean up resize listener
   onUnmounted(() => {
     window.removeEventListener('resize', checkMobile)
+    window.removeEventListener('touchstart', onTouchStart)
+    window.removeEventListener('touchend', onTouchEnd)
   })
 })
 
