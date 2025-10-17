@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
-import type { Group } from 'three'
+import type { Group, PerspectiveCamera, Vector3 } from 'three'
 import { Html } from '@tresjs/cientos'
 
 // ============================================================================
@@ -24,6 +24,12 @@ interface CardConfig {
 interface AnimationPhaseResult {
   position: Vector3Tuple
   rotation: { y: number; z: number }
+}
+
+interface OrbitControlsType {
+  addEventListener?: (event: string, callback: () => void) => void
+  removeEventListener?: (event: string, callback: () => void) => void
+  target?: Vector3
 }
 
 // ============================================================================
@@ -132,10 +138,7 @@ const HTML_TEXT = {
   POSITION: [0, 0, 0.15] as [number, number, number],
   ROTATION: [-Math.PI / 2, 0, 0] as [number, number, number],
   DISTANCE_FACTOR: 0.5,
-  VISIBILITY_Z_THRESHOLD: 0.1,
 } as const
-
-const INITIAL_VISIBLE_CARDS_COUNT = 3
 
 // ============================================================================
 // PROPS
@@ -253,7 +256,7 @@ const smoothLerp = (current: number, target: number, delta: number): number => {
 // STATE MANAGEMENT
 // ============================================================================
 
-const nextWordIndex = ref(INITIAL_VISIBLE_CARDS_COUNT)
+const nextWordIndex = ref(3)
 const isAnimating = ref(false)
 const animationProgress = ref(0)
 const showText = ref(true)
@@ -273,8 +276,8 @@ const card3Ref = shallowRef<Group | null>(null)
 const allCardRefs = [card1Ref, card2Ref, card3Ref] as const
 
 // Camera and controls refs
-const cameraRef = shallowRef(null)
-const orbitControlsRef = shallowRef(null)
+const cameraRef = shallowRef<PerspectiveCamera | null>(null)
+const orbitControlsRef = shallowRef<OrbitControlsType | null>(null)
 
 // Track if user is currently interacting
 const isInteracting = ref(false)
@@ -558,6 +561,14 @@ const onTouchEnd = (event: TouchEvent): void => {
 }
 
 onMounted(() => {
+  // Initialize shuffled words
+  shuffledWords.value = shuffleArray(props.words)
+  cardWords.value = [
+    shuffledWords.value[0] ?? '',
+    shuffledWords.value[1] ?? '',
+    shuffledWords.value[2] ?? ''
+  ]
+
   // Check if mobile FIRST before initializing positions
   const checkMobile = () => {
     const wasMobile = isMobile.value
@@ -580,41 +591,35 @@ onMounted(() => {
 
   // Set up orbit controls event listeners after next tick
   nextTick(() => {
-    if (orbitControlsRef.value) {
-      const controls = orbitControlsRef.value as any
-      if (controls.addEventListener) {
-        controls.addEventListener('start', onControlsStart)
-        controls.addEventListener('end', onControlsEnd)
-      }
+    const controls = orbitControlsRef.value
+    if (controls?.addEventListener) {
+      controls.addEventListener('start', onControlsStart)
+      controls.addEventListener('end', onControlsEnd)
     }
   })
 
-  // Clean up resize listener
+  // Clean up on unmount
   onUnmounted(() => {
     window.removeEventListener('resize', checkMobile)
     window.removeEventListener('touchstart', onTouchStart)
     window.removeEventListener('touchend', onTouchEnd)
-  })
-})
-
-onUnmounted(() => {
-  // Clean up event listeners
-  if (orbitControlsRef.value) {
-    const controls = orbitControlsRef.value as any
-    if (controls.removeEventListener) {
+    
+    // Clean up orbit controls event listeners
+    const controls = orbitControlsRef.value
+    if (controls?.removeEventListener) {
       controls.removeEventListener('start', onControlsStart)
       controls.removeEventListener('end', onControlsEnd)
     }
-  }
+  })
 })
 
 /**
  * Springs the camera back to default position
  */
 const springCameraBack = (delta: number): void => {
-  if (!cameraRef.value || isInteracting.value) return
+  const camera = cameraRef.value
+  if (!camera || isInteracting.value) return
 
-  const camera = cameraRef.value as any
   const targetPosition = isMobile.value ? CAMERA.POSITION_MOBILE : CAMERA.POSITION
   const targetLookAt = isMobile.value ? CAMERA.LOOK_AT_MOBILE : CAMERA.LOOK_AT
 
@@ -624,13 +629,11 @@ const springCameraBack = (delta: number): void => {
   camera.position.z += (targetPosition[2] - camera.position.z) * ORBIT_CONTROLS.SPRING_BACK_SPEED
 
   // Reset the orbit controls target if it exists
-  if (orbitControlsRef.value) {
-    const controls = orbitControlsRef.value as any
-    if (controls.target) {
-      controls.target.x += (targetLookAt[0] - controls.target.x) * ORBIT_CONTROLS.SPRING_BACK_SPEED
-      controls.target.y += (targetLookAt[1] - controls.target.y) * ORBIT_CONTROLS.SPRING_BACK_SPEED
-      controls.target.z += (targetLookAt[2] - controls.target.z) * ORBIT_CONTROLS.SPRING_BACK_SPEED
-    }
+  const controls = orbitControlsRef.value
+  if (controls?.target) {
+    controls.target.x += (targetLookAt[0] - controls.target.x) * ORBIT_CONTROLS.SPRING_BACK_SPEED
+    controls.target.y += (targetLookAt[1] - controls.target.y) * ORBIT_CONTROLS.SPRING_BACK_SPEED
+    controls.target.z += (targetLookAt[2] - controls.target.z) * ORBIT_CONTROLS.SPRING_BACK_SPEED
   }
 }
 
@@ -693,23 +696,13 @@ const nextCard = (): void => {
   showNewText.value = false
 }
 
-// Initialize shuffled words on mount
-onMounted(() => {
-  shuffledWords.value = shuffleArray(props.words)
-  cardWords.value = [
-    shuffledWords.value[0] ?? '',
-    shuffledWords.value[1] ?? '',
-    shuffledWords.value[2] ?? ''
-  ]
-})
-
 // Watch for words prop changes (when difficulty changes)
 watch(() => props.words, (newWords) => {
   if (isAnimating.value) return
   
   // Shuffle new words and reset to first 3 words from new difficulty
   shuffledWords.value = shuffleArray(newWords)
-  nextWordIndex.value = INITIAL_VISIBLE_CARDS_COUNT
+  nextWordIndex.value = 3
   cardWords.value = [
     shuffledWords.value[0] ?? '',
     shuffledWords.value[1] ?? '',

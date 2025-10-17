@@ -37,11 +37,6 @@ const handleDifficultyChange = (difficulty: 'easy' | 'medium' | 'hard') => {
 </template>
 
 <style scoped>
-button {
-  backdrop-filter: blur(10px);
-  border: 2px solid rgba(255, 255, 255, 0.1);
-}
-
 .main {
   position: fixed;
   width: 100%;
