@@ -509,7 +509,7 @@ const onControlsEnd = (): void => {
  * Handles touch start for swipe detection
  */
 const onTouchStart = (event: TouchEvent): void => {
-  if (!isMobile.value) return
+  if (!isMobile.value || !event.touches[0]) return
   
   const touch = event.touches[0]
   touchStartX.value = touch.clientX
@@ -521,7 +521,7 @@ const onTouchStart = (event: TouchEvent): void => {
  * Handles touch end and detects swipe gesture
  */
 const onTouchEnd = (event: TouchEvent): void => {
-  if (!isMobile.value || isAnimating.value) return
+  if (!isMobile.value || isAnimating.value || !event.changedTouches[0]) return
   
   const touch = event.changedTouches[0]
   const deltaX = touch.clientX - touchStartX.value
@@ -815,6 +815,24 @@ defineExpose({ nextCard, cardWords })
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   padding: 2rem 4rem;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .card-text {
+    max-width: 60rem;
+    padding: 1.5rem 3rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .card-text {
+    max-width: 40rem;
+    padding: 1rem 2rem;
+  }
 }
 
 @keyframes fadeIn {
