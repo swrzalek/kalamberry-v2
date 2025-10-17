@@ -57,6 +57,8 @@ const CARD_POSITIONS = {
   BACK: 2,
 } as const
 
+const MOBILE_Y_OFFSET = 0.3 // Move cards up on mobile - adjust this value to control vertical position
+
 const ARC_ANIMATION = {
   PHASE1: {
     X_DISTANCE: 6,
@@ -81,10 +83,11 @@ const CARD_ROTATIONS = {
 
 const CAMERA = {
   POSITION: [0, 0, 6] as [number, number, number],
-  POSITION_MOBILE: [0, -0.8, 6] as [number, number, number],
+  POSITION_MOBILE: [0, 0, 6] as [number, number, number],
   FOV: 50,
   FOV_MOBILE: 54,
   LOOK_AT: [0, 0, 0] as [number, number, number],
+  LOOK_AT_MOBILE: [0, -0.3, 0] as [number, number, number],
 } as const
 
 const ORBIT_CONTROLS = {
@@ -238,6 +241,7 @@ const showNewText = ref(false)
 const isMobile = ref(false)
 const currentFOV = computed(() => isMobile.value ? CAMERA.FOV_MOBILE : CAMERA.FOV)
 const currentCameraPosition = computed(() => isMobile.value ? CAMERA.POSITION_MOBILE : CAMERA.POSITION)
+const currentLookAt = computed(() => isMobile.value ? CAMERA.LOOK_AT_MOBILE : CAMERA.LOOK_AT)
 
 // Card refs - using shallowRef as recommended by TresJS docs
 const card1Ref = shallowRef<Group | null>(null)
@@ -375,7 +379,8 @@ const roundedGeometry = new RoundedBoxGeometry(
 const initializeCardPositions = (): void => {
   cards.forEach((card, index) => {
     if (card.ref.value) {
-      card.ref.value.position.set(...card.basePosition)
+      const yOffset = isMobile.value ? MOBILE_Y_OFFSET : 0
+      card.ref.value.position.set(card.basePosition[0], card.basePosition[1] + yOffset, card.basePosition[2])
       card.ref.value.rotation.set(...card.baseRotation)
     }
   })
@@ -389,7 +394,9 @@ const animateFrontCard = (frontCardRef: Group, rawProgress: number): void => {
     ? calculatePhase1Animation(rawProgress)
     : calculatePhase2Animation(rawProgress)
 
+  const yOffset = isMobile.value ? MOBILE_Y_OFFSET : 0
   applyAnimationToCard(frontCardRef, animation)
+  frontCardRef.position.y += yOffset
 }
 
 /**
@@ -404,6 +411,8 @@ const animateMiddleCard = (middleCardRef: Group, rawProgress: number, delta: num
     ? CARD_ROTATIONS.MIDDLE
     : CARD_ROTATIONS.MIDDLE - easeInOutCubic((rawProgress - ANIMATION.PHASE_SPLIT) * 2) * CARD_ROTATIONS.MIDDLE
 
+  const yOffset = isMobile.value ? MOBILE_Y_OFFSET : 0
+  middleCardRef.position.y = yOffset
   middleCardRef.position.z = smoothLerp(middleCardRef.position.z, targetZ, delta)
   middleCardRef.rotation.y = smoothLerp(middleCardRef.rotation.y, targetRotY, delta)
 }
@@ -420,6 +429,8 @@ const animateBackCard = (backCardRef: Group, rawProgress: number, delta: number)
     ? CARD_ROTATIONS.BACK
     : CARD_ROTATIONS.BACK + easeInOutCubic((rawProgress - ANIMATION.PHASE_SPLIT) * 2) * (CARD_ROTATIONS.MIDDLE + Math.abs(CARD_ROTATIONS.BACK))
 
+  const yOffset = isMobile.value ? MOBILE_Y_OFFSET : 0
+  backCardRef.position.y = yOffset
   backCardRef.position.z = smoothLerp(backCardRef.position.z, targetZ, delta)
   backCardRef.rotation.y = smoothLerp(backCardRef.rotation.y, targetRotY, delta)
 }
@@ -433,10 +444,11 @@ const completeAnimation = (): void => {
     cardOrder.value.push(frontCard)
     
     // Set final positions for all cards based on new order
+    const yOffset = isMobile.value ? MOBILE_Y_OFFSET : 0
     cardOrder.value.forEach((cardIndex, positionIndex) => {
     const cardRef = allCardRefs[cardIndex]
       if (cardRef?.value && cards[positionIndex]) {
-        cardRef.value.position.set(...cards[positionIndex].basePosition)
+        cardRef.value.position.set(cards[positionIndex].basePosition[0], cards[positionIndex].basePosition[1] + yOffset, cards[positionIndex].basePosition[2])
         cardRef.value.rotation.set(...cards[positionIndex].baseRotation)
       }
     })
@@ -483,13 +495,20 @@ const onControlsEnd = (): void => {
 }
 
 onMounted(() => {
-  initializeCardPositions()
-
-  // Check if mobile on mount and add resize listener
+  // Check if mobile FIRST before initializing positions
   const checkMobile = () => {
+    const wasMobile = isMobile.value
     isMobile.value = window.innerWidth <= 768
+    
+    // Re-initialize card positions if mobile state changed
+    if (wasMobile !== isMobile.value) {
+      initializeCardPositions()
+    }
   }
+  
   checkMobile()
+  initializeCardPositions()
+  
   window.addEventListener('resize', checkMobile)
 
   // Set up orbit controls event listeners after next tick
@@ -528,6 +547,7 @@ const springCameraBack = (delta: number): void => {
 
   const camera = cameraRef.value as any
   const targetPosition = isMobile.value ? CAMERA.POSITION_MOBILE : CAMERA.POSITION
+  const targetLookAt = isMobile.value ? CAMERA.LOOK_AT_MOBILE : CAMERA.LOOK_AT
 
   // Smoothly interpolate camera position back to default
   camera.position.x += (targetPosition[0] - camera.position.x) * ORBIT_CONTROLS.SPRING_BACK_SPEED
@@ -538,9 +558,9 @@ const springCameraBack = (delta: number): void => {
   if (orbitControlsRef.value) {
     const controls = orbitControlsRef.value as any
     if (controls.target) {
-      controls.target.x += (0 - controls.target.x) * ORBIT_CONTROLS.SPRING_BACK_SPEED
-      controls.target.y += (0 - controls.target.y) * ORBIT_CONTROLS.SPRING_BACK_SPEED
-      controls.target.z += (0 - controls.target.z) * ORBIT_CONTROLS.SPRING_BACK_SPEED
+      controls.target.x += (targetLookAt[0] - controls.target.x) * ORBIT_CONTROLS.SPRING_BACK_SPEED
+      controls.target.y += (targetLookAt[1] - controls.target.y) * ORBIT_CONTROLS.SPRING_BACK_SPEED
+      controls.target.z += (targetLookAt[2] - controls.target.z) * ORBIT_CONTROLS.SPRING_BACK_SPEED
     }
   }
 }
@@ -626,7 +646,7 @@ defineExpose({ nextCard, cardWords })
     ref="cameraRef"
     :position="currentCameraPosition"
     :fov="currentFOV"
-    :look-at="CAMERA.LOOK_AT"
+    :look-at="currentLookAt"
   />
   <OrbitControls
     ref="orbitControlsRef"
