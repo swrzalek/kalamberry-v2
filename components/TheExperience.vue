@@ -741,8 +741,10 @@ defineExpose({ nextCard, cardWords })
         transform
         :distance-factor="HTML_TEXT.DISTANCE_FACTOR"
       >
-        <div class="card-text">
-          {{ card1Word }}
+        <div class="card-text-container">
+          <div class="card-text">
+            {{ card1Word }}
+          </div>
         </div>
       </Html>
     </TresGroup>
@@ -763,8 +765,10 @@ defineExpose({ nextCard, cardWords })
         transform
         :distance-factor="HTML_TEXT.DISTANCE_FACTOR"
       >
-        <div class="card-text">
-          {{ card2Word }}
+        <div class="card-text-container">
+          <div class="card-text">
+            {{ card2Word }}
+          </div>
         </div>
       </Html>
     </TresGroup>
@@ -785,8 +789,10 @@ defineExpose({ nextCard, cardWords })
         transform
         :distance-factor="HTML_TEXT.DISTANCE_FACTOR"
       >
-        <div class="card-text">
-          {{ card3Word }}
+        <div class="card-text-container">
+          <div class="card-text">
+            {{ card3Word }}
+          </div>
         </div>
       </Html>
     </TresGroup>
@@ -794,16 +800,24 @@ defineExpose({ nextCard, cardWords })
 </template>
 
 <style scoped>
+.card-text-container {
+  width: 125rem;
+  height: 175rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  user-select: none;
+}
+
 .card-text {
   font-size: 11rem;
   font-weight: 700;
   color: white;
-  pointer-events: none;
-  user-select: none;
   white-space: normal;
   word-wrap: break-word;
   overflow-wrap: break-word;
-  max-width: 80rem;
+  max-width: 110rem;
   animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
   letter-spacing: 0.02em;
@@ -814,24 +828,21 @@ defineExpose({ nextCard, cardWords })
   line-height: 1.1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  padding: 2rem 4rem;
   text-align: center;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: 0 2rem;
 }
 
 @media (max-width: 768px) {
   .card-text {
-    max-width: 60rem;
-    padding: 1.5rem 3rem;
+    max-width: 100rem;
+    padding: 0 1.5rem;
   }
 }
 
 @media (max-width: 480px) {
   .card-text {
-    max-width: 40rem;
-    padding: 1rem 2rem;
+    max-width: 90rem;
+    padding: 0 1rem;
   }
 }
 
