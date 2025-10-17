@@ -154,6 +154,22 @@ const props = withDefaults(defineProps<{
 const { onBeforeRender } = useLoop()
 
 /**
+ * Shuffles an array using Fisher-Yates algorithm
+ * @param array - Array to shuffle
+ * @returns Shuffled copy of the array
+ */
+const shuffleArray = <T>(array: T[]): T[] => {
+  const shuffled = [...array]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    const temp = shuffled[i] as T
+    shuffled[i] = shuffled[j] as T
+    shuffled[j] = temp
+  }
+  return shuffled
+}
+
+/**
  * Easing function for smooth cubic ease-in-out animation
  * @param t - Progress value between 0 and 1
  * @returns Eased progress value
@@ -300,7 +316,10 @@ const cardOrder = ref([
   CARD_POSITIONS.BACK,
 ])
 
-// Reactive word assignments - initialize with words from props
+// Shuffled words for random order
+const shuffledWords = ref<string[]>([])
+
+// Reactive word assignments - initialize with words from shuffled array
 const cardWords = ref<string[]>([
   props.words[0] ?? '',
   props.words[1] ?? '',
@@ -466,11 +485,11 @@ const completeAnimation = (): void => {
     
     // Update card words array AFTER card order changes
     cardWords.value.shift()
-    const nextWord = props.words[nextWordIndex.value]
+    const nextWord = shuffledWords.value[nextWordIndex.value]
     if (nextWord) {
       cardWords.value.push(nextWord)
     }
-    nextWordIndex.value = (nextWordIndex.value + 1) % props.words.length
+    nextWordIndex.value = (nextWordIndex.value + 1) % shuffledWords.value.length
 
   // Reset animation state
     isAnimating.value = false
@@ -674,16 +693,27 @@ const nextCard = (): void => {
   showNewText.value = false
 }
 
+// Initialize shuffled words on mount
+onMounted(() => {
+  shuffledWords.value = shuffleArray(props.words)
+  cardWords.value = [
+    shuffledWords.value[0] ?? '',
+    shuffledWords.value[1] ?? '',
+    shuffledWords.value[2] ?? ''
+  ]
+})
+
 // Watch for words prop changes (when difficulty changes)
 watch(() => props.words, (newWords) => {
   if (isAnimating.value) return
   
-  // Reset to first 3 words from new difficulty
+  // Shuffle new words and reset to first 3 words from new difficulty
+  shuffledWords.value = shuffleArray(newWords)
   nextWordIndex.value = INITIAL_VISIBLE_CARDS_COUNT
   cardWords.value = [
-    newWords[0] ?? '',
-    newWords[1] ?? '',
-    newWords[2] ?? ''
+    shuffledWords.value[0] ?? '',
+    shuffledWords.value[1] ?? '',
+    shuffledWords.value[2] ?? ''
   ]
 }, { deep: true })
 
