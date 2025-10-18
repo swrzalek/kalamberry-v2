@@ -15,7 +15,8 @@
   "dependencies": {
     "@nuxt/eslint": "^1.9.0",
     "@tresjs/cientos": "^5.1.0",
-    "@tresjs/nuxt": "5.0.1",
+    "@tresjs/core": "^5.1.0",
+    "@tresjs/nuxt": "^5.1.0",
     "nuxt": "^4.1.2",
     "three": "^0.180.0",
     "vue": "latest",
